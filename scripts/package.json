@@ -1,0 +1,12 @@
+{
+  "name": "populate-english-words",
+  "version": "1.0.0",
+  "description": "Script para poblar Firestore con datos de ejemplo de English with Alex",
+  "main": "loadwords.js",
+  "scripts": {
+    "start": "node loadwords.js"
+  },
+  "dependencies": {
+    "firebase": "^10.8.0"
+  }
+}
