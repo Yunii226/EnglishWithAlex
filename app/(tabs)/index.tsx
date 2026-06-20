@@ -4,17 +4,15 @@ import { useUser } from "@clerk/clerk-expo";
 import { FontAwesome } from "@expo/vector-icons";
 import * as Speech from 'expo-speech';
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AddWordModal from "../components/AddWordModal";
 import SearchBar from "../components/searchBar";
 import { WordCard } from "../components/WordCard";
 
-//Atributos de las palabras
 type Word = {
   id: string;
   word: string;
   translation: string;
-  //Las tags no son obligatorias
   tags?: string[];
 }
 
@@ -30,12 +28,9 @@ export default function Index() {
   }, [user]);
 
   const loadWords = async () => {
-    // Si no hay usuario, no intentar cargar palabras
     if (!user) return;
-    // Si hay usuario, marcar que se están cargando las palabras
     setLoadingWords(true);
     try {
-      // Coger las palabras del usuario y guardarlas en el estado
       const userWords = await getUserWords(user.id);
       setWords(userWords as Word[]);
     } catch (error) {
@@ -45,7 +40,6 @@ export default function Index() {
     }
   };
 
-  // Función para el sonido de las palabras, al darle al icono se usa Speech de expo para pronunciar la palabra en inglés
   const handleSpeak = (word: string) => {
     Speech.speak(word, {
       language: 'en-UK',
@@ -58,39 +52,39 @@ export default function Index() {
     await loadWords();
   };
 
-  //Eliminar palabra
   const handleDeleteWord = (wordId: string, wordText: string) => {
     if (!user) return;
-    
-    //Esto no funciona en web
-    //TODO: Hacer que funcione en web también, quizás con un confirm de JavaScript
-    Alert.alert(
-      'Eliminar palabra',
-      `¿Estás seguro de que quieres eliminar "${wordText}"?`,
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteWord(user.id, wordId);
-              setWords(prevWords => prevWords.filter(w => w.id !== wordId));
-              Alert.alert('Éxito', 'Palabra eliminada correctamente');
-            } catch (error) {
-              console.error("Error eliminando palabra:", error);
-              Alert.alert('Error', 'No se pudo eliminar la palabra');
-            }
-          },
-        },
-      ]
-    );
+
+    const doDelete = async () => {
+      try {
+        await deleteWord(user.id, wordId);
+        setWords(prevWords => prevWords.filter(w => w.id !== wordId));
+      } catch (error) {
+        console.error("Error eliminando palabra:", error);
+        if (Platform.OS === 'web') {
+          window.alert('No se pudo eliminar la palabra');
+        } else {
+          Alert.alert('Error', 'No se pudo eliminar la palabra');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`¿Eliminar "${wordText}"?`)) {
+        doDelete();
+      }
+    } else {
+      Alert.alert(
+        'Eliminar palabra',
+        `¿Estás seguro de que quieres eliminar "${wordText}"?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Eliminar', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
 
-  // Función para renderizar cada palabra en la lista
   const renderWord = ({ item }: { item: Word }) => (
     <WordCard
       word={item.word}
@@ -101,7 +95,6 @@ export default function Index() {
     />
   );
 
-  // Filtrar palabras basándose en la búsqueda
   const filteredWords = words.filter(word => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
@@ -112,33 +105,31 @@ export default function Index() {
     );
   });
 
-  // Contenido de la pantalla principal
   return (
     <View style={styles.container}>
-      {/* Barra para buscar las palabras */}
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
 
-      {/* Mostrar loading, mensaje de lista vacía o lista de palabras */}
       {loadingWords ? (
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
       ) : words.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No hay palabras guardadas todavía.</Text>
-          <Image 
-            source={require('@/assets/images/AlexTriste.png')} 
+          <Image
+            source={require('@/assets/images/AlexTriste.png')}
             style={styles.emptyImage}
           />
+          <Text style={styles.emptyText}>No hay palabras guardadas todavía.</Text>
+          <Text style={styles.emptySubText}>Pulsa el botón + para añadir tu primera palabra</Text>
         </View>
       ) : filteredWords.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No se encontraron palabras con "{searchQuery}"</Text>
-          <Image 
-            source={require('@/assets/images/AlexTriste.png')} 
+          <Image
+            source={require('@/assets/images/AlexTriste.png')}
             style={styles.emptyImage}
           />
+          <Text style={styles.emptyText}>No se encontraron palabras</Text>
+          <Text style={styles.emptySubText}>No hay resultados para "{searchQuery}"</Text>
         </View>
       ) : (
-        /* Lista de palabras filtrada */
         <FlatList
           data={filteredWords}
           renderItem={renderWord}
@@ -148,8 +139,7 @@ export default function Index() {
         />
       )}
 
-      {/* Botón flotante para añadir nueva palabra */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => setModalVisible(true)}
         activeOpacity={0.8}
@@ -157,7 +147,6 @@ export default function Index() {
         <FontAwesome name="plus" size={24} color={colors.white} />
       </TouchableOpacity>
 
-      {/* Modal para añadir nueva palabra */}
       {user && (
         <AddWordModal
           visible={modalVisible}
@@ -170,52 +159,60 @@ export default function Index() {
   );
 }
 
-
-// Estilos para la pantalla principal
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: colors.white,
+  },
+  loader: {
+    marginTop: 40,
   },
   list: {
     flex: 1,
     width: "100%",
   },
   listContent: {
-    paddingVertical: 10,
-    paddingBottom: 80, // Espacio para el boton flotante
+    paddingHorizontal: 16,
+    paddingBottom: 100,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 40,
   },
   emptyImage: {
-    width: 400,
-    height: 400,
+    width: 220,
+    height: 220,
     resizeMode: 'contain',
+    marginBottom: 24,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textDark,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
     color: colors.gray,
     textAlign: "center",
-    marginBottom: 20,
   },
   fab: {
     position: 'absolute',
     bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    right: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
-    shadowColor: colors.black,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
 });

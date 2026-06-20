@@ -12,7 +12,7 @@ interface GameCardProps {
 
 export default function GameCard({ title, description, icon, color, onPress }: GameCardProps) {
   return (
-    <Pressable 
+    <Pressable
       style={({ pressed }) => [
         styles.gameCard,
         pressed && styles.gameCardPressed
@@ -24,6 +24,10 @@ export default function GameCard({ title, description, icon, color, onPress }: G
       </View>
       <Text style={styles.gameTitle}>{title}</Text>
       <Text style={styles.gameDescription}>{description}</Text>
+      <View style={[styles.playBadge, { backgroundColor: color + '18' }]}>
+        <FontAwesome name="play" size={10} color={color} style={{ marginRight: 4 }} />
+        <Text style={[styles.playBadgeText, { color }]}>Jugar</Text>
+      </View>
     </Pressable>
   );
 }
@@ -32,42 +36,54 @@ const styles = StyleSheet.create({
   gameCard: {
     width: '47%',
     backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 20,
-    minHeight: 200,
+    borderRadius: 20,
+    padding: 22,
+    minHeight: 210,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderLight,
   },
   gameCardPressed: {
-    opacity: 0.7,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.8,
+    transform: [{ scale: 0.97 }],
   },
   iconContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 14,
   },
   gameTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.textDark,
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   gameDescription: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.grayDark,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 17,
+    marginBottom: 14,
+  },
+  playBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  playBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

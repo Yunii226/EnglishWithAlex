@@ -9,52 +9,42 @@ interface SearchBarProps {
 }
 
 const SearchBar = ({ value, onChangeText }: SearchBarProps) => {
-    // Renderiza el componente
     return (
-        <View style={styles.contenedor}>
+        <View style={styles.container}>
+            <FontAwesome name="search" size={18} style={styles.icon} />
             <TextInput
                 style={styles.input}
                 placeholder="Buscar palabra o traducción..."
+                placeholderTextColor={colors.gray}
                 value={value}
                 onChangeText={onChangeText}
             />
-            <FontAwesome name="search" size={22} style={styles.icon} />
         </View>
     );
 };
-// Estilos para el componente SearchBar
+
 const styles = StyleSheet.create({
-    contenedor: {
-        padding: 20,
+    container: {
         flexDirection: 'row',
         alignItems: 'center',
-        
+        backgroundColor: colors.background,
+        borderRadius: 14,
+        marginHorizontal: 16,
+        marginVertical: 12,
+        paddingHorizontal: 14,
+        borderWidth: 1.5,
+        borderColor: colors.border,
     },
-    label: {
-        fontSize: 16,
-        marginBottom: 8,
-        color: colors.textDark,
+    icon: {
+        color: colors.gray,
+        marginRight: 10,
     },
     input: {
         flex: 1,
-        borderWidth: 1,
-        borderColor: colors.primary,
-        borderRadius: 20,
-        padding: 10,
-        paddingRight: 40, 
-        marginBottom: 15,
-        fontSize: 16,
-        
-        
+        paddingVertical: 12,
+        fontSize: 15,
+        color: colors.textDark,
     },
-    resultado: {
-        fontSize: 18,
-        color: colors.primary,
-    },
-    icon:{
-        marginLeft:-30,
-        marginTop:-16,
-        color: colors.gray,
-    }
 });
+
 export default SearchBar;
