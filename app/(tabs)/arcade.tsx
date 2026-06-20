@@ -1,92 +1,133 @@
 import { colors } from '@/constants/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from "expo-router";
-import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import GameCard from "../components/GameCard";
 
 export default function Arcade() {
   const router = useRouter();
+  const titleAnim = useRef(new Animated.Value(0)).current;
+  const contentAnim = useRef(new Animated.Value(30)).current;
 
-  // Navegar al juego de Quiz
-  const handleQuizPress = () => {
-    router.push('/(games)/quiz');
-  };
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(titleAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(contentAnim, { toValue: 0, useNativeDriver: true, tension: 60, friction: 10 }),
+    ]).start();
+  }, []);
 
-  // Navegar al juego de Listening
-  const handleListeningPress = () => {
-    router.push('/(games)/listening');
-  };
-
-  // Contenido de la pantalla del Arcade
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <Text style={styles.title}>Arcade</Text>
-      
-      {/* Grid con las tarjetas de los juegos disponibles */}
-      <View style={styles.gamesGrid}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      {/* Header con gradiente */}
+      <LinearGradient
+        colors={['#4F6EF7', '#7B95FF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <Animated.View style={{ opacity: titleAnim }}>
+          <Text style={styles.headerEmoji}>🎮</Text>
+          <Text style={styles.title}>Arcade</Text>
+          <Text style={styles.subtitle}>Practica y mejora tu inglés</Text>
+        </Animated.View>
+      </LinearGradient>
+
+      <Animated.View style={[styles.gamesGrid, { transform: [{ translateY: contentAnim }] }]}>
         <GameCard
           title="Quiz"
-          description="Elige la palabra correcta entre 4 opciones."
+          description="Elige la palabra correcta entre 4 opciones y pon a prueba tu vocabulario."
           icon="question-circle"
           color={colors.primary}
-          onPress={handleQuizPress}
+          gradientColors={['#4F6EF7', '#7B95FF']}
+          onPress={() => router.push('/(games)/quiz')}
         />
         <GameCard
           title="Listening"
-          description="Escucha y elige la opción correcta."
+          description="Escucha la pronunciación y elige la opción correcta."
           icon="headphones"
           color={colors.secondary}
-          onPress={handleListeningPress}
+          gradientColors={['#0EA5C9', '#38BDF8']}
+          onPress={() => router.push('/(games)/listening')}
         />
-      </View>
+      </Animated.View>
 
-      {/* Sección inferior con imagen del arcade */}
       <View style={styles.bottomSection}>
-        <Image 
-          source={require('@/assets/images/AlexArcade.png')} 
+        <Image
+          source={require('@/assets/images/AlexArcade.png')}
           style={styles.image}
         />
-        <Text style={styles.subtitle}>Más juegos pronto</Text>
+        <View style={styles.comingSoonBadge}>
+          <Text style={styles.comingSoonText}>🚀 Más juegos pronto</Text>
+        </View>
       </View>
     </ScrollView>
   );
 }
 
-// Estilos para la pantalla del Arcade
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
   },
   scrollContent: {
-    padding: 20,
+    paddingBottom: 40,
+  },
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 36,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    marginBottom: 8,
+  },
+  headerEmoji: {
+    fontSize: 36,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.textDark,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  gamesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 15,
-  },
-  bottomSection: {
-    alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 20,
-  },
-  image: {
-    width: 200,
-    height: 200,
-    resizeMode: 'contain',
-    marginBottom: 15,
+    fontSize: 36,
+    fontWeight: '800',
+    color: colors.white,
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+  },
+  gamesGrid: {
+    padding: 20,
+    gap: 16,
+  },
+  bottomSection: {
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  image: {
+    width: 180,
+    height: 180,
+    resizeMode: 'contain',
+    marginBottom: 16,
+  },
+  comingSoonBadge: {
+    backgroundColor: colors.card,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  comingSoonText: {
+    fontSize: 14,
     color: colors.grayDark,
-    textAlign: 'center',
+    fontWeight: '600',
   },
 });

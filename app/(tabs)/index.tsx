@@ -2,9 +2,10 @@ import { colors } from '@/constants/colors';
 import { deleteWord, getUserWords } from "@/services/wordService";
 import { useUser } from "@clerk/clerk-expo";
 import { FontAwesome } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import AddWordModal from "../components/AddWordModal";
 import SearchBar from "../components/searchBar";
 import { WordCard } from "../components/WordCard";
@@ -22,9 +23,15 @@ export default function Index() {
   const [loadingWords, setLoadingWords] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+  const fabScale = useRef(new Animated.Value(0)).current;
+  const headerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadWords();
+    Animated.parallel([
+      Animated.spring(fabScale, { toValue: 1, useNativeDriver: true, tension: 60, friction: 7, delay: 400 }),
+      Animated.timing(headerAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
   }, [user]);
 
   const loadWords = async () => {
@@ -41,11 +48,7 @@ export default function Index() {
   };
 
   const handleSpeak = (word: string) => {
-    Speech.speak(word, {
-      language: 'en-UK',
-      pitch: 1.0,
-      rate: 0.6,
-    });
+    Speech.speak(word, { language: 'en-UK', pitch: 1.0, rate: 0.6 });
   };
 
   const handleWordAdded = async () => {
@@ -85,13 +88,14 @@ export default function Index() {
     }
   };
 
-  const renderWord = ({ item }: { item: Word }) => (
+  const renderWord = ({ item, index }: { item: Word; index: number }) => (
     <WordCard
       word={item.word}
       translation={item.translation}
       tags={item.tags}
       onSpeakPress={() => handleSpeak(item.word)}
       onDelete={() => handleDeleteWord(item.id, item.word)}
+      index={index}
     />
   );
 
@@ -107,27 +111,43 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <Animated.View style={{ opacity: headerAnim }}>
+        <LinearGradient
+          colors={['#4F6EF7', '#7B95FF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View>
+            <Text style={styles.headerGreeting}>¡Hola! 👋</Text>
+            <Text style={styles.headerTitle}>Mis Palabras</Text>
+          </View>
+          <View style={styles.wordCountBadge}>
+            <Text style={styles.wordCountNumber}>{words.length}</Text>
+            <Text style={styles.wordCountLabel}>palabras</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
 
       {loadingWords ? (
-        <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loaderText}>Cargando palabras...</Text>
+        </View>
       ) : words.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Image
-            source={require('@/assets/images/AlexTriste.png')}
-            style={styles.emptyImage}
-          />
-          <Text style={styles.emptyText}>No hay palabras guardadas todavía.</Text>
+          <Image source={require('@/assets/images/AlexTriste.png')} style={styles.emptyImage} />
+          <Text style={styles.emptyText}>No hay palabras guardadas todavía</Text>
           <Text style={styles.emptySubText}>Pulsa el botón + para añadir tu primera palabra</Text>
         </View>
       ) : filteredWords.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Image
-            source={require('@/assets/images/AlexTriste.png')}
-            style={styles.emptyImage}
-          />
-          <Text style={styles.emptyText}>No se encontraron palabras</Text>
-          <Text style={styles.emptySubText}>No hay resultados para "{searchQuery}"</Text>
+          <Image source={require('@/assets/images/AlexTriste.png')} style={styles.emptyImage} />
+          <Text style={styles.emptyText}>Sin resultados</Text>
+          <Text style={styles.emptySubText}>No hay palabras para "{searchQuery}"</Text>
         </View>
       ) : (
         <FlatList
@@ -136,16 +156,26 @@ export default function Index() {
           keyExtractor={(item) => item.id}
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       )}
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setModalVisible(true)}
-        activeOpacity={0.8}
-      >
-        <FontAwesome name="plus" size={24} color={colors.white} />
-      </TouchableOpacity>
+      {/* FAB animado */}
+      <Animated.View style={[styles.fabWrapper, { transform: [{ scale: fabScale }] }]}>
+        <Pressable
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          onPress={() => setModalVisible(true)}
+        >
+          <LinearGradient
+            colors={['#4F6EF7', '#7B95FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}
+          >
+            <FontAwesome name="plus" size={22} color={colors.white} />
+          </LinearGradient>
+        </Pressable>
+      </Animated.View>
 
       {user && (
         <AddWordModal
@@ -162,10 +192,58 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
   },
-  loader: {
-    marginTop: 40,
+  header: {
+    paddingTop: 50,
+    paddingBottom: 22,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  headerGreeting: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.white,
+    letterSpacing: -0.5,
+  },
+  wordCountBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  wordCountNumber: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.white,
+    lineHeight: 28,
+  },
+  wordCountLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loaderText: {
+    fontSize: 14,
+    color: colors.gray,
+    fontWeight: '500',
   },
   list: {
     flex: 1,
@@ -173,7 +251,8 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingTop: 4,
+    paddingBottom: 110,
   },
   emptyContainer: {
     flex: 1,
@@ -182,14 +261,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyImage: {
-    width: 220,
-    height: 220,
+    width: 200,
+    height: 200,
     resizeMode: 'contain',
     marginBottom: 24,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textDark,
     textAlign: "center",
     marginBottom: 8,
@@ -198,21 +277,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.gray,
     textAlign: "center",
+    lineHeight: 20,
   },
-  fab: {
+  fabWrapper: {
     position: 'absolute',
     bottom: 30,
     right: 24,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: colors.primary,
+  },
+  fab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabGradient: {
+    width: 60,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+  },
+  fabPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.94 }],
   },
 });

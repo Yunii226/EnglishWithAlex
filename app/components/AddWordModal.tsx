@@ -1,8 +1,9 @@
 import { colors } from '@/constants/colors';
 import { addWord } from "@/services/wordService";
 import { FontAwesome } from "@expo/vector-icons";
-import { useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRef, useState } from "react";
+import { ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 interface AddWordModalProps {
   visible: boolean;
@@ -17,6 +18,8 @@ export default function AddWordModal({ visible, onClose, onWordAdded, userId }: 
   const [newTags, setNewTags] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const saveScale = useRef(new Animated.Value(1)).current;
 
   const handleAddWord = async () => {
     if (!newWord.trim() || !newTranslation.trim()) {
@@ -27,13 +30,8 @@ export default function AddWordModal({ visible, onClose, onWordAdded, userId }: 
     setSaving(true);
     setError('');
     try {
-      const tagsArray = newTags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
-
+      const tagsArray = newTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
       await addWord(userId, newWord.trim(), newTranslation.trim(), tagsArray);
-
       setNewWord('');
       setNewTranslation('');
       setNewTags('');
@@ -55,78 +53,125 @@ export default function AddWordModal({ visible, onClose, onWordAdded, userId }: 
     onClose();
   };
 
+  const animateSave = () => {
+    Animated.sequence([
+      Animated.spring(saveScale, { toValue: 0.95, useNativeDriver: true, speed: 50 }),
+      Animated.spring(saveScale, { toValue: 1, useNativeDriver: true, speed: 30 }),
+    ]).start();
+    handleAddWord();
+  };
+
+  const isDisabled = saving || !newWord.trim() || !newTranslation.trim();
+
   return (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={visible}
-      onRequestClose={handleClose}
-    >
+    <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
-        <Pressable
-          style={styles.modalBackground}
-          onPress={handleClose}
-        />
+        <Pressable style={styles.modalBackground} onPress={handleClose} />
         <View style={styles.modalContent}>
+          <View style={styles.dragHandle} />
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Añadir Palabra</Text>
+              <View style={styles.titleRow}>
+                <View style={styles.titleIcon}>
+                  <FontAwesome name="plus" size={14} color={colors.white} />
+                </View>
+                <Text style={styles.modalTitle}>Nueva Palabra</Text>
+              </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                <FontAwesome name="times" size={20} color={colors.grayDark} />
+                <FontAwesome name="times" size={18} color={colors.grayDark} />
               </TouchableOpacity>
             </View>
 
             {error ? (
               <View style={styles.errorContainer}>
-                <FontAwesome name="exclamation-circle" size={16} color={colors.error} />
+                <FontAwesome name="exclamation-circle" size={15} color={colors.error} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : null}
 
             <View style={styles.form}>
-              <Text style={styles.label}>Palabra en inglés</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: hello"
-                value={newWord}
-                onChangeText={(text) => { setNewWord(text); setError(''); }}
-                autoCapitalize="none"
-              />
+              <Text style={styles.label}>
+                <FontAwesome name="language" size={13} color={colors.primary} /> {'  '}Palabra en inglés
+              </Text>
+              <View style={[styles.inputWrapper, focusedField === 'word' && styles.inputWrapperFocused]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: accomplish"
+                  placeholderTextColor={colors.gray}
+                  value={newWord}
+                  onChangeText={(text) => { setNewWord(text); setError(''); }}
+                  onFocus={() => setFocusedField('word')}
+                  onBlur={() => setFocusedField(null)}
+                  autoCapitalize="none"
+                />
+              </View>
             </View>
 
             <View style={styles.form}>
-              <Text style={styles.label}>Traducción al español</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: hola"
-                value={newTranslation}
-                onChangeText={(text) => { setNewTranslation(text); setError(''); }}
-                autoCapitalize="none"
-              />
+              <Text style={styles.label}>
+                <FontAwesome name="exchange" size={13} color={colors.secondary} /> {'  '}Traducción al español
+              </Text>
+              <View style={[styles.inputWrapper, focusedField === 'translation' && styles.inputWrapperFocused]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: lograr, conseguir"
+                  placeholderTextColor={colors.gray}
+                  value={newTranslation}
+                  onChangeText={(text) => { setNewTranslation(text); setError(''); }}
+                  onFocus={() => setFocusedField('translation')}
+                  onBlur={() => setFocusedField(null)}
+                  autoCapitalize="none"
+                />
+              </View>
             </View>
 
             <View style={styles.form}>
-              <Text style={styles.label}>Tags <Text style={styles.labelOptional}>(separados por comas, opcional)</Text></Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: saludos, básico"
-                value={newTags}
-                onChangeText={setNewTags}
-                autoCapitalize="none"
-              />
+              <Text style={styles.label}>
+                <FontAwesome name="tag" size={13} color={colors.accent} /> {'  '}
+                Tags <Text style={styles.labelOptional}>(opcional, separados por comas)</Text>
+              </Text>
+              <View style={[styles.inputWrapper, focusedField === 'tags' && styles.inputWrapperFocused]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: verbos, negocios"
+                  placeholderTextColor={colors.gray}
+                  value={newTags}
+                  onChangeText={setNewTags}
+                  onFocus={() => setFocusedField('tags')}
+                  onBlur={() => setFocusedField(null)}
+                  autoCapitalize="none"
+                />
+              </View>
             </View>
 
-            <TouchableOpacity
-              style={[styles.saveButton, (saving || !newWord.trim() || !newTranslation.trim()) && styles.saveButtonDisabled]}
-              onPress={handleAddWord}
-              disabled={saving || !newWord.trim() || !newTranslation.trim()}
-            >
-              {saving ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.saveButtonText}>Guardar Palabra</Text>
-              )}
-            </TouchableOpacity>
+            <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+              <TouchableOpacity
+                onPress={animateSave}
+                disabled={isDisabled}
+                activeOpacity={0.9}
+                style={styles.saveButtonWrapper}
+              >
+                {isDisabled ? (
+                  <View style={styles.saveButtonDisabled}>
+                    {saving ? (
+                      <ActivityIndicator color={colors.white} />
+                    ) : (
+                      <Text style={styles.saveButtonText}>Guardar Palabra</Text>
+                    )}
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={['#4F6EF7', '#7B95FF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.saveButtonGradient}
+                  >
+                    <FontAwesome name="check" size={16} color={colors.white} style={{ marginRight: 8 }} />
+                    <Text style={styles.saveButtonText}>Guardar Palabra</Text>
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
           </ScrollView>
         </View>
       </View>
@@ -141,45 +186,64 @@ const styles = StyleSheet.create({
   },
   modalBackground: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(10, 15, 40, 0.5)',
   },
   modalContent: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 24,
-    paddingBottom: 44,
-    maxHeight: '85%',
+    paddingBottom: 48,
+    maxHeight: '88%',
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  titleIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: colors.textDark,
+    letterSpacing: -0.3,
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff0f0',
+    backgroundColor: '#FEF2F2',
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     borderLeftWidth: 3,
     borderLeftColor: colors.error,
     marginBottom: 16,
@@ -187,51 +251,75 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: colors.error,
-    fontSize: 14,
+    fontSize: 13,
     flex: 1,
+    fontWeight: '500',
   },
   form: {
     marginBottom: 18,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textDark,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textMedium,
     marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   labelOptional: {
-    fontWeight: '400',
+    fontWeight: '500',
     color: colors.gray,
+    textTransform: 'none',
+    letterSpacing: 0,
   },
-  input: {
+  inputWrapper: {
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: 12,
-    padding: 13,
-    fontSize: 16,
+    borderRadius: 14,
     backgroundColor: colors.background,
+    overflow: 'hidden',
+  },
+  inputWrapperFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.white,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  input: {
+    padding: 14,
+    fontSize: 16,
     color: colors.textDark,
   },
-  saveButton: {
-    backgroundColor: colors.primary,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
+  saveButtonWrapper: {
     marginTop: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  saveButtonGradient: {
+    flexDirection: 'row',
+    padding: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButtonDisabled: {
     backgroundColor: colors.gray,
-    shadowOpacity: 0,
-    elevation: 0,
+    padding: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
   saveButtonText: {
     color: colors.white,
     fontSize: 17,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

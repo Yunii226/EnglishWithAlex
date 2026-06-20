@@ -1,6 +1,7 @@
 import { colors } from '@/constants/colors';
 import { FontAwesome } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface WordCardProps {
   word: string;
@@ -8,100 +9,140 @@ interface WordCardProps {
   tags?: string[];
   onSpeakPress?: () => void;
   onDelete?: () => void;
+  index?: number;
 }
 
-export function WordCard({ word, translation, tags, onSpeakPress, onDelete }: WordCardProps) {
+export function WordCard({ word, translation, tags, onSpeakPress, onDelete, index = 0 }: WordCardProps) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(24)).current;
+  const speakScale = useRef(new Animated.Value(1)).current;
+  const deleteScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 350,
+        delay: index * 60,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        delay: index * 60,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 10,
+      }),
+    ]).start();
+  }, []);
+
+  const animatePress = (scaleRef: Animated.Value) => {
+    Animated.sequence([
+      Animated.spring(scaleRef, { toValue: 0.82, useNativeDriver: true, speed: 50 }),
+      Animated.spring(scaleRef, { toValue: 1, useNativeDriver: true, speed: 30 }),
+    ]).start();
+  };
+
   return (
-    <View style={styles.wordCard}>
-      <View style={styles.contentContainer}>
-        <View style={styles.textContainer}>
-          <Text style={styles.wordText}>{word}</Text>
-          <Text style={styles.translationText}>{translation}</Text>
-          {tags && tags.length > 0 && (
-            <View style={styles.tagsContainer}>
-              {tags.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-        <View style={styles.actionsContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.speakerButton,
-              pressed && styles.buttonPressed
-            ]}
-            onPress={onSpeakPress}
-          >
-            <FontAwesome name="volume-up" size={20} color={colors.secondary} />
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.deleteButton,
-              pressed && styles.buttonPressed
-            ]}
-            onPress={onDelete}
-          >
-            <FontAwesome name="trash" size={20} color={colors.error} />
-          </Pressable>
+    <Animated.View style={[styles.wrapper, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+      <View style={styles.wordCard}>
+        <View style={styles.accentBar} />
+        <View style={styles.contentContainer}>
+          <View style={styles.textContainer}>
+            <Text style={styles.wordText}>{word}</Text>
+            <Text style={styles.translationText}>{translation}</Text>
+            {tags && tags.length > 0 && (
+              <View style={styles.tagsContainer}>
+                {tags.map((tag, i) => (
+                  <View key={i} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+          <View style={styles.actionsContainer}>
+            <Pressable
+              onPress={() => { animatePress(speakScale); onSpeakPress?.(); }}
+            >
+              <Animated.View style={[styles.actionButton, styles.speakerButton, { transform: [{ scale: speakScale }] }]}>
+                <FontAwesome name="volume-up" size={18} color={colors.secondary} />
+              </Animated.View>
+            </Pressable>
+            <Pressable
+              onPress={() => { animatePress(deleteScale); onDelete?.(); }}
+            >
+              <Animated.View style={[styles.actionButton, styles.deleteButton, { transform: [{ scale: deleteScale }] }]}>
+                <FontAwesome name="trash" size={18} color={colors.error} />
+              </Animated.View>
+            </Pressable>
+          </View>
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    marginVertical: 5,
+  },
   wordCard: {
-    backgroundColor: colors.background,
-    padding: 16,
-    marginVertical: 6,
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.secondary,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    shadowColor: '#4F6EF7',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  accentBar: {
+    width: 4,
+    backgroundColor: colors.primary,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
   },
   contentContainer: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    padding: 14,
   },
   textContainer: {
     flex: 1,
     marginRight: 12,
   },
   wordText: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 17,
+    fontWeight: "700",
     color: colors.textDark,
-    marginBottom: 4,
+    marginBottom: 3,
+    letterSpacing: 0.2,
   },
   translationText: {
-    fontSize: 15,
+    fontSize: 14,
     color: colors.grayDark,
     marginBottom: 6,
   },
   tagsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: 5,
     marginTop: 2,
   },
   tag: {
-    backgroundColor: colors.secondary,
-    paddingVertical: 3,
-    paddingHorizontal: 9,
-    borderRadius: 10,
+    backgroundColor: colors.secondaryLight,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 20,
   },
   tagText: {
-    color: colors.white,
+    color: colors.secondary,
     fontSize: 11,
     fontWeight: "600",
   },
@@ -111,20 +152,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
   },
   speakerButton: {
-    backgroundColor: "#e6f4f8",
+    backgroundColor: '#E0F6FF',
   },
   deleteButton: {
-    backgroundColor: "#fff0f0",
-  },
-  buttonPressed: {
-    opacity: 0.6,
-    transform: [{ scale: 0.92 }],
+    backgroundColor: '#FEE2E2',
   },
 });

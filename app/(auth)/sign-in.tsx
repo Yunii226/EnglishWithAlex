@@ -2,9 +2,32 @@ import { colors } from '@/constants/colors';
 import { useSignIn } from '@clerk/clerk-expo';
 import type { EmailCodeFactor } from '@clerk/types';
 import { FontAwesome } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
+function InputField({
+    icon, placeholder, value, onChangeText, secureTextEntry, keyboardType, focused, onFocus, onBlur
+}: any) {
+    return (
+        <View style={[authStyles.inputContainer, focused && authStyles.inputContainerFocused]}>
+            <FontAwesome name={icon} size={18} color={focused ? colors.primary : colors.gray} style={authStyles.inputIcon} />
+            <TextInput
+                style={authStyles.input}
+                placeholder={placeholder}
+                placeholderTextColor={colors.gray}
+                value={value}
+                onChangeText={onChangeText}
+                onFocus={onFocus}
+                onBlur={onBlur}
+                secureTextEntry={secureTextEntry}
+                keyboardType={keyboardType ?? 'default'}
+                autoCapitalize="none"
+            />
+        </View>
+    );
+}
 
 export default function Page() {
     const { signIn, setActive, isLoaded } = useSignIn()
@@ -16,64 +39,36 @@ export default function Page() {
     const [showEmailCode, setShowEmailCode] = React.useState(false)
     const [error, setError] = React.useState('')
     const [loading, setLoading] = React.useState(false)
+    const [focused, setFocused] = React.useState<string | null>(null)
 
-    // Handle the submission of the sign-in form
     const onSignInPress = React.useCallback(async () => {
         if (!isLoaded) return
-
         setError('')
         setLoading(true)
-        // Start the sign-in process using the email and password provided
         try {
-            const signInAttempt = await signIn.create({
-                identifier: emailAddress,
-                password,
-            })
+            const signInAttempt = await signIn.create({ identifier: emailAddress, password })
 
-            // If sign-in process is complete, set the created session as active
-            // and redirect the user
             if (signInAttempt.status === 'complete') {
                 await setActive({
                     session: signInAttempt.createdSessionId,
                     navigate: async ({ session }) => {
-                        if (session?.currentTask) {
-                            // Check for tasks and navigate to custom UI to help users resolve them
-                            // See https://clerk.com/docs/guides/development/custom-flows/authentication/session-tasks
-                            console.log(session?.currentTask)
-                            return
-                        }
-
+                        if (session?.currentTask) { console.log(session?.currentTask); return }
                         router.replace('/')
                     },
                 })
             } else if (signInAttempt.status === 'needs_second_factor') {
-                // Check if email_code is a valid second factor
-                // This is required when Client Trust is enabled and the user
-                // is signing in from a new device.
-                // See https://clerk.com/docs/guides/secure/client-trust
                 const emailCodeFactor = signInAttempt.supportedSecondFactors?.find(
                     (factor): factor is EmailCodeFactor => factor.strategy === 'email_code',
                 )
-
                 if (emailCodeFactor) {
-                    await signIn.prepareSecondFactor({
-                        strategy: 'email_code',
-                        emailAddressId: emailCodeFactor.emailAddressId,
-                    })
+                    await signIn.prepareSecondFactor({ strategy: 'email_code', emailAddressId: emailCodeFactor.emailAddressId })
                     setShowEmailCode(true)
                 }
             } else {
-                // If the status is not complete, check why. User may need to
-                // complete further steps.
                 console.error(JSON.stringify(signInAttempt, null, 2))
             }
         } catch (err: any) {
-            // See https://clerk.com/docs/guides/development/custom-flows/error-handling
-            // for more info on error handling
-            console.error(JSON.stringify(err, null, 2))
-            
-            if (err.errors?.[0]?.code === 'form_password_incorrect' || 
-                err.errors?.[0]?.code === 'form_identifier_not_found') {
+            if (err.errors?.[0]?.code === 'form_password_incorrect' || err.errors?.[0]?.code === 'form_identifier_not_found') {
                 setError('Correo electrónico o contraseña incorrectos')
             } else {
                 setError('Error al iniciar sesión. Por favor, intenta de nuevo.')
@@ -83,28 +78,16 @@ export default function Page() {
         }
     }, [isLoaded, signIn, setActive, router, emailAddress, password])
 
-    // Handle the submission of the email verification code
     const onVerifyPress = React.useCallback(async () => {
         if (!isLoaded) return
-
         setError('')
         try {
-            const signInAttempt = await signIn.attemptSecondFactor({
-                strategy: 'email_code',
-                code,
-            })
-
+            const signInAttempt = await signIn.attemptSecondFactor({ strategy: 'email_code', code })
             if (signInAttempt.status === 'complete') {
                 await setActive({
                     session: signInAttempt.createdSessionId,
                     navigate: async ({ session }) => {
-                        if (session?.currentTask) {
-                            // Check for tasks and navigate to custom UI to help users resolve them
-                            // See https://clerk.com/docs/guides/development/custom-flows/authentication/session-tasks
-                            console.log(session?.currentTask)
-                            return
-                        }
-
+                        if (session?.currentTask) { console.log(session?.currentTask); return }
                         router.replace('/')
                     },
                 })
@@ -112,158 +95,92 @@ export default function Page() {
                 console.error(JSON.stringify(signInAttempt, null, 2))
             }
         } catch (err: any) {
-            console.error(JSON.stringify(err, null, 2))
-            
             if (err.errors?.[0]?.code === 'form_code_incorrect') {
-                setError('Código de verificación incorrecto. Por favor, intenta de nuevo.')
+                setError('Código de verificación incorrecto.')
             } else {
-                setError('Error al verificar el código. Por favor, intenta de nuevo.')
+                setError('Error al verificar el código.')
             }
         }
     }, [isLoaded, signIn, setActive, router, code])
 
-    // Display email code verification form
     if (showEmailCode) {
         return (
-            <KeyboardAvoidingView 
-                style={styles.container} 
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            >
-                <ScrollView 
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <View style={styles.header}>
-                        <View style={styles.iconCircle}>
-                            <Image source={require('@/assets/images/Alex.png')} style={styles.logo} />
-                        </View>
-                        <Text style={styles.title}>Verifica tu email</Text>
-                        <Text style={styles.subtitle}>
-                            Hemos enviado un código de verificación a tu correo electrónico
-                        </Text>
+            <KeyboardAvoidingView style={authStyles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                <LinearGradient colors={['#4F6EF7', '#7B95FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={authStyles.topGradient}>
+                    <View style={authStyles.logoCircle}>
+                        <Image source={require('@/assets/images/Alex.png')} style={authStyles.logo} />
                     </View>
-
-                    {error ? (
-                        <View style={styles.errorContainer}>
-                            <FontAwesome name="exclamation-circle" size={20} color={colors.error} />
-                            <Text style={styles.errorText}>{error}</Text>
-                        </View>
-                    ) : null}
-
-                    <View style={styles.formGroup}>
-                        <Text style={styles.label}>Código de verificación</Text>
-                        <View style={styles.inputContainer}>
-                            <FontAwesome name="key" size={20} color={colors.grayDark} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                value={code}
-                                placeholder="Ingresa el código"
-                                placeholderTextColor={colors.gray}
-                                onChangeText={(code) => setCode(code)}
-                                keyboardType="numeric"
-                            />
-                        </View>
-                    </View>
-
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.button,
-                            !code && styles.buttonDisabled,
-                            pressed && styles.buttonPressed
-                        ]}
-                        onPress={onVerifyPress}
-                        disabled={!code}
-                    >
-                        <Text style={styles.buttonText}>Verificar</Text>
-                    </Pressable>
+                    <Text style={authStyles.gradientTitle}>Verifica tu email</Text>
+                    <Text style={authStyles.gradientSubtitle}>Hemos enviado un código a tu correo</Text>
+                </LinearGradient>
+                <ScrollView contentContainerStyle={authStyles.scrollContent} showsVerticalScrollIndicator={false}>
+                    {error ? <ErrorBox text={error} /> : null}
+                    <Text style={authStyles.label}>Código de verificación</Text>
+                    <InputField
+                        icon="key"
+                        placeholder="Ingresa el código"
+                        value={code}
+                        onChangeText={(v: string) => setCode(v)}
+                        keyboardType="numeric"
+                        focused={focused === 'code'}
+                        onFocus={() => setFocused('code')}
+                        onBlur={() => setFocused(null)}
+                    />
+                    <AuthButton label="Verificar" onPress={onVerifyPress} disabled={!code} loading={false} />
                 </ScrollView>
             </KeyboardAvoidingView>
         )
     }
 
     return (
-        <KeyboardAvoidingView 
-            style={styles.container} 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-            <ScrollView 
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                <View style={styles.header}>
-                    <View style={styles.iconCircle}>
-                        <Image source={require('@/assets/images/Alex.png')} style={styles.logo} />
-                    </View>
-                    <Text style={styles.title}>Bienvenido</Text>
-                    <Text style={styles.subtitle}>Inicia sesión para continuar aprendiendo</Text>
+        <KeyboardAvoidingView style={authStyles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <LinearGradient colors={['#4F6EF7', '#7B95FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={authStyles.topGradient}>
+                <View style={authStyles.logoCircle}>
+                    <Image source={require('@/assets/images/Alex.png')} style={authStyles.logo} />
+                </View>
+                <Text style={authStyles.gradientTitle}>¡Bienvenido!</Text>
+                <Text style={authStyles.gradientSubtitle}>Inicia sesión para continuar aprendiendo</Text>
+            </LinearGradient>
+
+            <ScrollView contentContainerStyle={authStyles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                {error ? <ErrorBox text={error} /> : null}
+
+                <Text style={authStyles.label}>Correo electrónico</Text>
+                <InputField
+                    icon="envelope"
+                    placeholder="tu@email.com"
+                    value={emailAddress}
+                    onChangeText={(v: string) => setEmailAddress(v)}
+                    keyboardType="email-address"
+                    focused={focused === 'email'}
+                    onFocus={() => setFocused('email')}
+                    onBlur={() => setFocused(null)}
+                />
+
+                <Text style={[authStyles.label, { marginTop: 16 }]}>Contraseña</Text>
+                <InputField
+                    icon="lock"
+                    placeholder="Tu contraseña"
+                    value={password}
+                    onChangeText={(v: string) => setPassword(v)}
+                    secureTextEntry
+                    focused={focused === 'password'}
+                    onFocus={() => setFocused('password')}
+                    onBlur={() => setFocused(null)}
+                />
+
+                <AuthButton label="Iniciar sesión" onPress={onSignInPress} disabled={!emailAddress || !password || loading} loading={loading} />
+
+                <View style={authStyles.divider}>
+                    <View style={authStyles.dividerLine} />
+                    <Text style={authStyles.dividerText}>O</Text>
+                    <View style={authStyles.dividerLine} />
                 </View>
 
-                {error ? (
-                    <View style={styles.errorContainer}>
-                        <FontAwesome name="exclamation-circle" size={20} color={colors.error} />
-                        <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                ) : null}
-
-                <View style={styles.formGroup}>
-                    <Text style={styles.label}>Correo electrónico</Text>
-                    <View style={styles.inputContainer}>
-                        <FontAwesome name="envelope" size={20} color={colors.grayDark} style={styles.inputIcon} />
-                        <TextInput
-                            style={styles.input}
-                            autoCapitalize="none"
-                            value={emailAddress}
-                            placeholder="tu@email.com"
-                            placeholderTextColor={colors.gray}
-                            onChangeText={(emailAddress) => setEmailAddress(emailAddress)}
-                            keyboardType="email-address"
-                        />
-                    </View>
-                </View>
-
-                <View style={styles.formGroup}>
-                    <Text style={styles.label}>Contraseña</Text>
-                    <View style={styles.inputContainer}>
-                        <FontAwesome name="lock" size={20} color={colors.grayDark} style={styles.inputIcon} />
-                        <TextInput
-                            style={styles.input}
-                            value={password}
-                            placeholder="Tu contraseña"
-                            placeholderTextColor={colors.gray}
-                            secureTextEntry={true}
-                            onChangeText={(password) => setPassword(password)}
-                        />
-                    </View>
-                </View>
-
-                <Pressable
-                    style={({ pressed }) => [
-                        styles.button,
-                        (!emailAddress || !password || loading) && styles.buttonDisabled,
-                        pressed && styles.buttonPressed,
-                    ]}
-                    onPress={onSignInPress}
-                    disabled={!emailAddress || !password || loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color={colors.white} />
-                    ) : (
-                        <Text style={styles.buttonText}>Iniciar sesión</Text>
-                    )}
-                </Pressable>
-
-                <View style={styles.divider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>O</Text>
-                    <View style={styles.dividerLine} />
-                </View>
-
-                <View style={styles.linkContainer}>
-                    <Text style={styles.linkText}>¿No tienes una cuenta? </Text>
+                <View style={authStyles.linkContainer}>
+                    <Text style={authStyles.linkText}>¿No tienes una cuenta? </Text>
                     <Link href="/sign-up" asChild>
-                        <Pressable>
-                            <Text style={styles.linkButton}>Regístrate</Text>
-                        </Pressable>
+                        <Pressable><Text style={authStyles.linkButton}>Regístrate</Text></Pressable>
                     </Link>
                 </View>
             </ScrollView>
@@ -271,88 +188,139 @@ export default function Page() {
     )
 }
 
-const styles = StyleSheet.create({
+function ErrorBox({ text }: { text: string }) {
+    return (
+        <View style={authStyles.errorContainer}>
+            <FontAwesome name="exclamation-circle" size={16} color={colors.error} />
+            <Text style={authStyles.errorText}>{text}</Text>
+        </View>
+    );
+}
+
+function AuthButton({ label, onPress, disabled, loading }: { label: string; onPress: () => void; disabled: boolean; loading: boolean }) {
+    return (
+        <Pressable
+            style={({ pressed }) => [authStyles.button, disabled && authStyles.buttonDisabled, pressed && authStyles.buttonPressed]}
+            onPress={onPress}
+            disabled={disabled}
+        >
+            {loading ? (
+                <ActivityIndicator color={colors.white} />
+            ) : disabled ? (
+                <Text style={authStyles.buttonText}>{label}</Text>
+            ) : (
+                <LinearGradient colors={['#4F6EF7', '#7B95FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={authStyles.buttonGradient}>
+                    <Text style={authStyles.buttonText}>{label}</Text>
+                </LinearGradient>
+            )}
+        </Pressable>
+    );
+}
+
+export const authStyles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: colors.background,
     },
-    scrollContent: {
-        padding: 20,
+    topGradient: {
         paddingTop: 60,
-    },
-    header: {
+        paddingBottom: 36,
         alignItems: 'center',
-        marginBottom: 40,
+        borderBottomLeftRadius: 36,
+        borderBottomRightRadius: 36,
     },
-    iconCircle: {
-        width: 180,
-        height: 180,
-        borderRadius: 90,
-        backgroundColor: '#e6f4ff',
+    logoCircle: {
+        width: 110,
+        height: 110,
+        borderRadius: 55,
+        backgroundColor: 'rgba(255,255,255,0.9)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
         overflow: 'hidden',
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 6,
     },
     logo: {
-        width: 220,
-        height: 220,
+        width: 120,
+        height: 120,
         resizeMode: 'contain',
     },
-    title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: colors.textDark,
-        marginBottom: 8,
+    gradientTitle: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: colors.white,
+        marginBottom: 6,
+        letterSpacing: -0.3,
     },
-    subtitle: {
-        fontSize: 16,
-        color: colors.grayDark,
+    gradientSubtitle: {
+        fontSize: 15,
+        color: 'rgba(255,255,255,0.85)',
+        fontWeight: '500',
+        paddingHorizontal: 30,
         textAlign: 'center',
-        paddingHorizontal: 20,
     },
-    formGroup: {
-        marginBottom: 20,
+    scrollContent: {
+        padding: 24,
+        paddingTop: 28,
+        paddingBottom: 40,
     },
     label: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: colors.textDark,
+        fontSize: 13,
+        fontWeight: '700',
+        color: colors.textMedium,
         marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: colors.border,
-        borderRadius: 12,
-        backgroundColor: colors.background,
-        paddingHorizontal: 12,
+        borderRadius: 14,
+        backgroundColor: colors.white,
+        paddingHorizontal: 14,
+    },
+    inputContainerFocused: {
+        borderColor: colors.primary,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 3,
     },
     inputIcon: {
         marginRight: 10,
     },
     input: {
         flex: 1,
-        padding: 14,
+        paddingVertical: 14,
         fontSize: 16,
         color: colors.textDark,
     },
     button: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 12,
+        borderRadius: 14,
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 24,
+        overflow: 'hidden',
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    buttonGradient: {
+        width: '100%',
+        paddingVertical: 17,
+        alignItems: 'center',
     },
     buttonPressed: {
-        opacity: 0.8,
-        transform: [{ scale: 0.98 }],
+        opacity: 0.85,
+        transform: [{ scale: 0.99 }],
     },
     buttonDisabled: {
         backgroundColor: colors.gray,
@@ -361,13 +329,15 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: colors.white,
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 17,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+        paddingVertical: 17,
     },
     divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 30,
+        marginVertical: 28,
     },
     dividerLine: {
         flex: 1,
@@ -375,39 +345,40 @@ const styles = StyleSheet.create({
         backgroundColor: colors.border,
     },
     dividerText: {
-        marginHorizontal: 10,
+        marginHorizontal: 12,
         color: colors.gray,
-        fontSize: 14,
+        fontSize: 13,
+        fontWeight: '600',
     },
     linkContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
     },
     linkText: {
-        fontSize: 16,
+        fontSize: 15,
         color: colors.grayDark,
     },
     linkButton: {
-        fontSize: 16,
+        fontSize: 15,
         color: colors.primary,
-        fontWeight: 'bold',
+        fontWeight: '700',
     },
     errorContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#ffe6e6',
+        backgroundColor: '#FEF2F2',
         padding: 12,
-        borderRadius: 8,
-        borderLeftWidth: 4,
+        borderRadius: 12,
+        borderLeftWidth: 3,
         borderLeftColor: colors.error,
         marginBottom: 20,
+        gap: 8,
     },
     errorText: {
         color: colors.error,
-        fontSize: 14,
-        marginLeft: 8,
+        fontSize: 13,
         flex: 1,
+        fontWeight: '500',
     },
-})
+});
