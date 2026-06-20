@@ -19,6 +19,30 @@ export default function GamesLayout() {
                     headerBackTitle: "Arcade"
                 }}
             />
+            <Stack.Screen
+                name="spelling"
+                options={{
+                    title: "Escribe",
+                    headerShown: true,
+                    headerBackTitle: "Arcade"
+                }}
+            />
+            <Stack.Screen
+                name="memory"
+                options={{
+                    title: "Parejas",
+                    headerShown: true,
+                    headerBackTitle: "Arcade"
+                }}
+            />
+            <Stack.Screen
+                name="scramble"
+                options={{
+                    title: "Anagrama",
+                    headerShown: true,
+                    headerBackTitle: "Arcade"
+                }}
+            />
         </Stack>
     );
 }

@@ -1,15 +1,19 @@
 import { colors } from '@/constants/colors';
+import { getUserStats, levelFromXp, type UserStats } from '@/services/statsService';
+import { getUserWords } from '@/services/wordService';
 import { useClerk, useUser } from '@clerk/clerk-expo';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef } from "react";
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function Profile() {
   const { signOut } = useClerk();
   const { user } = useUser();
   const router = useRouter();
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [wordCount, setWordCount] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
 
@@ -19,6 +23,17 @@ export default function Profile() {
       Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 60, friction: 10 }),
     ]).start();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (user) {
+        getUserStats(user.id).then(s => { if (active) setStats(s); });
+        getUserWords(user.id).then(w => { if (active) setWordCount(w.length); }).catch(() => {});
+      }
+      return () => { active = false; };
+    }, [user])
+  );
 
   const handleSignOut = async () => {
     try {
@@ -30,9 +45,13 @@ export default function Profile() {
   };
 
   const firstName = user?.firstName ?? user?.emailAddresses[0]?.emailAddress?.split('@')[0] ?? 'Usuario';
+  const level = stats ? levelFromXp(stats.xp) : null;
+  const accuracy = stats && stats.totalQuestions > 0
+    ? Math.round((stats.totalCorrect / stats.totalQuestions) * 100)
+    : 0;
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <LinearGradient
         colors={['#4F6EF7', '#7B95FF']}
         start={{ x: 0, y: 0 }}
@@ -47,10 +66,51 @@ export default function Profile() {
           </View>
           <Text style={styles.name}>{firstName}</Text>
           <Text style={styles.email}>{user?.emailAddresses[0]?.emailAddress}</Text>
+          {level && (
+            <View style={styles.levelChip}>
+              <FontAwesome name="star" size={12} color={colors.white} />
+              <Text style={styles.levelChipText}>Nivel {level.level} · {stats?.xp ?? 0} XP</Text>
+            </View>
+          )}
         </Animated.View>
       </LinearGradient>
 
       <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        <Text style={styles.sectionTitle}>Tu progreso</Text>
+        <View style={styles.statsGrid}>
+          <View style={styles.statBox}>
+            <Text style={styles.statEmoji}>🔥</Text>
+            <Text style={styles.statValue}>{stats?.dayStreak ?? 0}</Text>
+            <Text style={styles.statLabel}>Días de racha</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statEmoji}>🎮</Text>
+            <Text style={styles.statValue}>{stats?.gamesPlayed ?? 0}</Text>
+            <Text style={styles.statLabel}>Partidas</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statEmoji}>🎯</Text>
+            <Text style={styles.statValue}>{accuracy}%</Text>
+            <Text style={styles.statLabel}>Precisión</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statEmoji}>⚡</Text>
+            <Text style={styles.statValue}>{stats?.bestStreak ?? 0}</Text>
+            <Text style={styles.statLabel}>Mejor racha</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statEmoji}>✅</Text>
+            <Text style={styles.statValue}>{stats?.totalCorrect ?? 0}</Text>
+            <Text style={styles.statLabel}>Aciertos</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statEmoji}>📚</Text>
+            <Text style={styles.statValue}>{wordCount}</Text>
+            <Text style={styles.statLabel}>Palabras</Text>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Cuenta</Text>
         <View style={styles.infoCard}>
           <FontAwesome name="envelope-o" size={18} color={colors.primary} />
           <View style={styles.infoText}>
@@ -83,7 +143,7 @@ export default function Profile() {
           </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -91,6 +151,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  scroll: {
+    paddingBottom: 40,
   },
   headerGradient: {
     paddingTop: 60,
@@ -134,9 +197,70 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     fontWeight: '500',
   },
+  levelChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    marginTop: 12,
+  },
+  levelChipText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   content: {
     padding: 24,
     gap: 14,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.gray,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+  },
+  statBox: {
+    width: '31%',
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#4F6EF7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  statEmoji: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.textDark,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.gray,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 2,
   },
   infoCard: {
     flexDirection: 'row',

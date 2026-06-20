@@ -1,10 +1,11 @@
 import { colors } from '@/constants/colors';
+import { saveGameResult } from "@/services/statsService";
 import { getUserWords } from "@/services/wordService";
 import { useUser } from "@clerk/clerk-expo";
 import { FontAwesome } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as Speech from 'expo-speech';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type Word = {
@@ -30,6 +31,8 @@ export default function Listening() {
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const [gameFinished, setGameFinished] = useState(false);
     const [notEnoughWords, setNotEnoughWords] = useState(false);
+    const streakRef = useRef(0);
+    const bestStreakRef = useRef(0);
 
     useEffect(() => {
         initializeQuiz();
@@ -51,6 +54,8 @@ export default function Listening() {
             setSelectedOption(null);
             setCurrentQuestionIndex(0);
             setScore(0);
+            streakRef.current = 0;
+            bestStreakRef.current = 0;
 
             const userWords = await getUserWords(user.id) as Word[];
 
@@ -106,7 +111,13 @@ export default function Listening() {
         const isCorrect = option === currentQuestion.correctTranslation;
         const newScore = isCorrect ? score + 1 : score;
 
-        if (isCorrect) setScore(newScore);
+        if (isCorrect) {
+            setScore(newScore);
+            streakRef.current += 1;
+            bestStreakRef.current = Math.max(bestStreakRef.current, streakRef.current);
+        } else {
+            streakRef.current = 0;
+        }
 
         setTimeout(() => {
             if (currentQuestionIndex < questions.length - 1) {
@@ -115,6 +126,13 @@ export default function Listening() {
             } else {
                 setScore(newScore);
                 setGameFinished(true);
+                if (user) {
+                    saveGameResult(user.id, {
+                        correct: newScore,
+                        total: questions.length,
+                        bestStreak: bestStreakRef.current,
+                    });
+                }
             }
         }, 1000);
     };

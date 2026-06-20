@@ -3,10 +3,10 @@
   "configurations": [
     {
       "name": "expo-web",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["expo", "start", "--web"],
-      "port": 8081,
-      "autoPort": true
+      "runtimeExecutable": "C:\\Users\\unaig\\prueba-git\\EnglishWithAlex\\.claude\\start-web.cmd",
+      "runtimeArgs": [],
+      "port": 8090,
+      "autoPort": false
     }
   ]
 }
